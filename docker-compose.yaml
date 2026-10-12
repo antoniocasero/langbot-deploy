@@ -1,7 +1,13 @@
 # LangBot deployment for Coolify.
-# Copied from langbot-app/LangBot docker/docker-compose.yaml with the optional
-# `langbot_box` sandbox service removed: its ${...} volume substitutions are
-# rejected by Coolify, and it needs the host Docker socket, which we don't want.
+#
+# Derived from langbot-app/LangBot docker/docker-compose.yaml. Two changes:
+#  - volume sources are literal paths, not ${...}: Coolify rejects variable
+#    substitution in volume sources as a command-injection risk.
+#  - the Box root host path and in-container path are identical (/data/langbot-box),
+#    which the Box runtime requires because it mounts the host Docker socket.
+#
+# Secrets live in Coolify env vars, never in this file:
+#   LANGBOT_PLUGIN_RUNTIME_CONTROL_TOKEN, LANGBOT_BOX_CONTROL_TOKEN
 services:
   langbot_plugin_runtime:
     image: rockchin/langbot:latest
@@ -15,6 +21,22 @@ services:
     networks:
       - langbot_network
 
+  # Box sandbox runtime. NOT published to the host on purpose: port 5410 stays
+  # inside this bridge network. It does mount the host Docker socket, which is
+  # why nothing else on this network should be untrusted.
+  langbot_box:
+    image: rockchin/langbot:latest
+    restart: unless-stopped
+    volumes:
+      - /data/langbot-box:/data/langbot-box
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ=Europe/Madrid
+      - LANGBOT_BOX_CONTROL_TOKEN=${LANGBOT_BOX_CONTROL_TOKEN:-}
+    command: ["uv", "run", "--no-sync", "-m", "langbot_plugin.cli.__init__", "box"]
+    networks:
+      - langbot_network
+
   langbot:
     image: rockchin/langbot:latest
     restart: unless-stopped
@@ -23,7 +45,12 @@ services:
     environment:
       - TZ=Europe/Madrid
       - LANGBOT_PLUGIN_RUNTIME_CONTROL_TOKEN=${LANGBOT_PLUGIN_RUNTIME_CONTROL_TOKEN:-}
-      - BOX__ENABLED=false
+      - LANGBOT_BOX_CONTROL_TOKEN=${LANGBOT_BOX_CONTROL_TOKEN:-}
+      - BOX__LOCAL__HOST_ROOT=/data/langbot-box
+      - BOX__LOCAL__DEFAULT_WORKSPACE=default
+      - BOX__LOCAL__SKILLS_ROOT=skills
+      - BOX__LOCAL__ALLOWED_MOUNT_ROOTS=/data/langbot-box
+      - BOX__DOCKER__CPU_LIMIT_ENABLED=true
     ports:
       - 5300:5300
       - 2280-2285:2280-2285
