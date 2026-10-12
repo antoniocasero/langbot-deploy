@@ -46,6 +46,9 @@ services:
       - TZ=Europe/Madrid
       - LANGBOT_PLUGIN_RUNTIME_CONTROL_TOKEN=${LANGBOT_PLUGIN_RUNTIME_CONTROL_TOKEN:-}
       - LANGBOT_BOX_CONTROL_TOKEN=${LANGBOT_BOX_CONTROL_TOKEN:-}
+      # data/config.yaml persists box.enabled from previous runs, so pin it
+      # here or Box stays off even with langbot_box running.
+      - BOX__ENABLED=true
       - BOX__LOCAL__HOST_ROOT=/data/langbot-box
       - BOX__LOCAL__DEFAULT_WORKSPACE=default
       - BOX__LOCAL__SKILLS_ROOT=skills
