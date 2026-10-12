@@ -1,0 +1,35 @@
+# LangBot deployment for Coolify.
+# Copied from langbot-app/LangBot docker/docker-compose.yaml with the optional
+# `langbot_box` sandbox service removed: its ${...} volume substitutions are
+# rejected by Coolify, and it needs the host Docker socket, which we don't want.
+services:
+  langbot_plugin_runtime:
+    image: rockchin/langbot:latest
+    restart: unless-stopped
+    volumes:
+      - ./data/plugins:/app/data/plugins
+    environment:
+      - TZ=Europe/Madrid
+      - LANGBOT_PLUGIN_RUNTIME_CONTROL_TOKEN=${LANGBOT_PLUGIN_RUNTIME_CONTROL_TOKEN:-}
+    command: ["uv", "run", "--no-sync", "-m", "langbot_plugin.cli.__init__", "rt"]
+    networks:
+      - langbot_network
+
+  langbot:
+    image: rockchin/langbot:latest
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TZ=Europe/Madrid
+      - LANGBOT_PLUGIN_RUNTIME_CONTROL_TOKEN=${LANGBOT_PLUGIN_RUNTIME_CONTROL_TOKEN:-}
+      - BOX__ENABLED=false
+    ports:
+      - 5300:5300
+      - 2280-2285:2280-2285
+    networks:
+      - langbot_network
+
+networks:
+  langbot_network:
+    driver: bridge
